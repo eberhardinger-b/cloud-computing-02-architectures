@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lab 02 — Notes App</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+    h1   { font-size: 1.4rem; }
+    input[type=text] { width: 70%; padding: 8px; font-size: 1rem; }
+    button { padding: 8px 16px; font-size: 1rem; cursor: pointer; }
+    ul   { list-style: none; padding: 0; }
+    li   { display: flex; justify-content: space-between; align-items: center;
+           padding: 8px 4px; border-bottom: 1px solid #ddd; }
+    .meta { font-size: 0.75rem; color: #888; margin-top: 4px; }
+    .del { color: #c00; background: none; border: none; cursor: pointer; font-size: 1rem; }
+    #instance-info { font-size: 0.8rem; color: #555; margin-top: 12px; }
+    .error { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>📝 Notes — Cloud Computing Lab 02</h1>
+  <div>
+    <input type="text" id="noteInput" placeholder="Enter a note..." />
+    <button onclick="createNote()">Save</button>
+  </div>
+  <div id="instance-info">Instance: —</div>
+  <div id="error-msg"></div>
+  <ul id="noteList"></ul>
+  <script>
+    const API = '/api/notes';
+
+    async function fetchNotes() {
+      try {
+        const res = await fetch(API);
+        const instanceId = res.headers.get('X-Instance-ID') || '—';
+        const appVersion = res.headers.get('X-App-Version') || '—';
+        document.getElementById('instance-info').textContent =
+          `Last response from instance: ${instanceId}  |  App version: ${appVersion}`;
+        if (!res.ok) {
+          const err = await res.json();
+          showError(`Error ${res.status}: ${err.error}`);
+          document.getElementById('noteList').innerHTML = '';
+          return;
+        }
+        clearError();
+        const notes = await res.json();
+        const ul = document.getElementById('noteList');
+        ul.innerHTML = notes.map(n => `
+          <li>
+            <div>
+              <span>${escapeHtml(n.text)}</span>
+              <div class="meta">ID: ${n.id} · ${new Date(n.created_at).toLocaleString()}</div>
+            </div>
+            <button class="del" onclick="deleteNote(${n.id})">✕</button>
+          </li>`).join('');
+      } catch (e) {
+        showError('Cannot reach API — is the backend running?');
+      }
+    }
+
+    async function createNote() {
+      const input = document.getElementById('noteInput');
+      const text  = input.value.trim();
+      if (!text) return;
+      const requestId = crypto.randomUUID();
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, request_id: requestId }),
+      });
+      if (res.ok || res.status === 200) {
+        input.value = '';
+        fetchNotes();
+      } else {
+        const err = await res.json();
+        showError(`Save failed (${res.status}): ${err.error}`);
+      }
+    }
+
+    async function deleteNote(id) {
+      await fetch(`${API}/${id}`, { method: 'DELETE' });
+      fetchNotes();
+    }
+
+    function showError(msg) {
+      document.getElementById('error-msg').innerHTML = `<p class="error">${msg}</p>`;
+    }
+    function clearError() {
+      document.getElementById('error-msg').innerHTML = '';
+    }
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    fetchNotes();
+    setInterval(fetchNotes, 3000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: lab02-notes-db
+    environment:
+      POSTGRES_DB: notesdb
+      POSTGRES_USER: notesuser
+      POSTGRES_PASSWORD: notespass
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notesuser -d notesdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./api
+#    container_name: lab02-notes-api
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: notesdb
+      DB_USER: notesuser
+      DB_PASSWORD: notespass
+      APP_VERSION: v1
+    depends_on:
+      db:
+        condition: service_healthy
+  #  ports:
+  #    - "5001:5001"
+
+  frontend:
+    build: ./frontend
+  #  container_name: lab02-notes-frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:
