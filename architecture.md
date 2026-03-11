@@ -67,7 +67,7 @@ Open the frontend in your browser: [http://localhost:8080](http://localhost:8080
 Create two or three notes using the UI, then verify the API directly:
 
 ```bash
-curl http://localhost:5001/api/notes
+curl http://localhost:8080/api/notes
 ```
 
 Inspect the running containers and their network connections:
@@ -78,10 +78,10 @@ docker compose ps
 
 # Inspect the network connecting the containers
 docker network ls
-docker network inspect architecture_lab_default
+docker network inspect "$(docker compose ps -q frontend | xargs docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}')"
 
 # Check the environment variables of the api container
-docker inspect lab02-notes-api | grep -A 20 '"Env"'
+docker compose exec api env | grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD|APP_VERSION)='
 ```
 
 Look at the `docker-compose.yml` file in the repository and read through it carefully.
@@ -107,7 +107,7 @@ Scale the `api` service to three instances:
 ```bash
 docker compose up -d --scale api=3
 ```
-This might not initial work with the configuration given. Debug it and change the code and or config.
+This might not initially work with the given configuration. Debug the issue and adjust the code and/or configuration.
 
 Verify three API containers are running:
 
@@ -123,7 +123,8 @@ for i in $(seq 1 15); do
 done
 ```
 
-You should see requests distributed across different instance IDs.
+You should often see requests distributed across different instance IDs.
+Depending on Docker DNS behavior and timing, you may temporarily see only one instance ID.
 
 Now simulate a configuration change (the equivalent of updating an environment variable in a cloud deployment). Stop all API instances and restart them with a new environment variable:
 
@@ -171,7 +172,9 @@ Now try to use the application. First via the UI at [http://localhost:8080](http
 curl -v http://localhost:8080/api/notes
 
 # Try to create a note
-curl -v -X POST http://localhost:8080/api/notes   -H "Content-Type: application/json"   -d '{"text": "test note"}'
+curl -v -X POST http://localhost:8080/api/notes \
+  -H "Content-Type: application/json" \
+  -d '{"text": "test note"}'
 ```
 
 Note:
@@ -218,15 +221,19 @@ az login
 az group create --name lab2-rg --location westeurope
 
 # Deploy the API container image to App Service
-az appservice plan create --name lab2-plan --resource-group lab2-rg   --is-linux --sku B1
+az appservice plan create --name lab2-plan --resource-group lab2-rg \
+  --is-linux --sku B1
 
-az webapp create --name lab2-api-<yourname>   --resource-group lab2-rg   --plan lab2-plan   --deployment-container-image-name ghcr.io/th-ulm-cloud/lab02-api:latest
+az webapp create --name lab2-api-<yourname> --resource-group lab2-rg \
+  --plan lab2-plan \
+  --deployment-container-image-name ghcr.io/th-ulm-cloud/lab02-api:latest
 ```
 
 Inspect the configuration:
 
 ```bash
-az webapp config appsettings list   --name lab2-api-<yourname> --resource-group lab2-rg
+az webapp config appsettings list \
+  --name lab2-api-<yourname> --resource-group lab2-rg
 ```
 
 > **🔵 Q-A1**: Where are the database connection settings stored in App Service? How does this compare to what you saw in the local `docker-compose.yml`? What would you need to change to point this deployment at a different database (e.g., Azure SQL instead of local PostgreSQL)?
@@ -236,10 +243,12 @@ az webapp config appsettings list   --name lab2-api-<yourname> --resource-group 
 Scale out your App Service to 3 instances and observe the instance IDs:
 
 ```bash
-az appservice plan update   --name lab2-plan --resource-group lab2-rg   --number-of-workers 3
+az appservice plan update --name lab2-plan --resource-group lab2-rg \
+  --number-of-workers 3
 
 for i in $(seq 1 15); do
-  curl -s -I https://lab2-api-<yourname>.azurewebsites.net/api/notes   | grep X-Instance-ID
+  curl -s -I https://lab2-api-<yourname>.azurewebsites.net/api/notes \
+    | grep X-Instance-ID
 done
 ```
 
