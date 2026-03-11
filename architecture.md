@@ -15,8 +15,8 @@
 - Terminal / shell access (macOS Terminal, Windows PowerShell, Linux bash)
 - The lab repository cloned or downloaded:
   ```bash
-  git clone https://github.com/th-ulm-cloud/lab02-architectures
-  cd lab02-architectures
+  git clone https://github.com/eberhardinger-b/cloud-computing-02-architectures.git
+  cd 2_Architecture
   ```
 
 ### Optional (Azure extension tasks)
@@ -107,7 +107,6 @@ Scale the `api` service to three instances:
 ```bash
 docker compose up -d --scale api=3
 ```
-This might not initially work with the given configuration. Debug the issue and adjust the code and/or configuration.
 
 Verify three API containers are running:
 
@@ -115,7 +114,7 @@ Verify three API containers are running:
 docker compose ps
 ```
 
-The `frontend` nginx container acts as a simple load balancer distributing requests across all three API instances. Each API instance returns its container hostname in a custom response header `X-Instance-ID`. Run the following to send 15 requests and observe which instance handles each one:
+The `frontend` nginx container proxies requests to the `api` service. Each API instance returns its container hostname in a custom response header `X-Instance-ID`. Run the following to send 15 requests and observe which instance handles each one:
 
 ```bash
 for i in $(seq 1 15); do
@@ -123,8 +122,29 @@ for i in $(seq 1 15); do
 done
 ```
 
-You should often see requests distributed across different instance IDs.
-Depending on Docker DNS behavior and timing, you may temporarily see only one instance ID.
+If all requests show the same `X-Instance-ID`, treat this as part of the exercise: scaling replicas alone is not enough; traffic distribution also depends on load-balancer and service-discovery behavior.
+
+Your task is to debug and improve the nginx/API routing setup so requests are distributed across instances.
+
+Acceptance criterion:
+- In 30 requests, at least 2 different `X-Instance-ID` values appear.
+
+Use this command to verify distribution:
+
+```bash
+for i in $(seq 1 30); do
+  curl -s -I http://localhost:8080/api/notes | awk -F': ' '/X-Instance-ID/ {print $2}'
+done | sort | uniq -c
+```
+
+Hints:
+- First confirm scaling actually happened: run `docker compose ps` and verify that 3 `api` containers are `Up`.
+- Compare your `frontend/nginx.conf` with the baseline and focus on the `upstream api_backend` block.
+- Ask yourself: does nginx resolve `api` only once, or can it refresh DNS results over time?
+- In the upstream config, investigate directives related to dynamic DNS updates (for example `resolver` and `resolve`).
+- Keep `/api/` proxying simple while debugging. Change one thing at a time, then retest.
+- After each nginx change, rebuild/restart frontend (`docker compose up -d --build frontend`) before measuring again.
+- Re-run the 30-request check after every change and compare counts (`sort | uniq -c`) to see whether distribution improved.
 
 Now simulate a configuration change (the equivalent of updating an environment variable in a cloud deployment). Stop all API instances and restart them with a new environment variable:
 
@@ -278,17 +298,6 @@ Submit a **single PDF or Markdown document** containing:
 
 ---
 
-## Timing Guide
-
-| Part | Suggested Time |
-|------|---------------|
-| Setup & Part 1 | 15 min |
-| Part 2 | 20 min |
-| Part 3 | 15 min |
-| Writing final answers | 10 min |
-| **Total** | **60 min** |
-
----
 
 ## Troubleshooting
 
