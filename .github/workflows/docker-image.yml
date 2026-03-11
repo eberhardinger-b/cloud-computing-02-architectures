@@ -5,11 +5,13 @@ on:
     branches: [main]
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
       contents: read
       packages: write
@@ -20,6 +22,8 @@ jobs:
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -27,6 +31,8 @@ jobs:
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           context: ./api
           push: true
@@ -34,6 +40,8 @@ jobs:
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           context: ./frontend
           push: true
