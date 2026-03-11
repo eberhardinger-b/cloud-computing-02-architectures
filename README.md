@@ -25,8 +25,8 @@ lab02-architectures/
 ## Quick Start
 
 ```bash
-git clone https://github.com/th-ulm-cloud/lab02-architectures
-cd lab02-architectures
+git clone https://github.com/eberhardinger-b/cloud-computing-02-architectures.git
+cd 2_Architecture
 docker compose up -d
 ```
 
@@ -48,10 +48,10 @@ docker compose ps
 # Scale API to 3 instances
 docker compose up -d --scale api=3
 
-# Observe instance distribution (15 requests)
-for i in $(seq 1 15); do
-  curl -s -I http://localhost:5001/api/notes | grep X-Instance-ID
-done
+# Observe instance distribution (30 requests)
+for i in $(seq 1 30); do
+  curl -s -I http://localhost:8080/api/notes | awk -F': ' '/X-Instance-ID/ {print $2}'
+done | sort | uniq -c
 
 # Simulate DB failure
 docker compose stop db
@@ -60,10 +60,16 @@ docker compose stop db
 docker compose start db
 
 # Inspect environment variables on api container
-docker inspect lab02-notes-api | grep -A 20 '"Env"'
+docker compose exec api env | grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD|APP_VERSION)='
 
 # View API logs
 docker compose logs api --tail=30
+```
+
+Note: If distribution still appears sticky after scaling, rebuild/restart frontend after nginx changes:
+
+```bash
+docker compose up -d --build frontend
 ```
 
 ## API Reference
@@ -86,7 +92,7 @@ docker compose logs api --tail=30
 | HTTP 503 on DB failure | `api/app.py` | Q3.2 |
 | Idempotency key + `ON CONFLICT DO NOTHING` | `api/app.py` + `db/init.sql` | Q3.3 |
 | `crypto.randomUUID()` sent from browser | `frontend/index.html` | Q3.3 |
-| nginx round-robin load balancer | `frontend/nginx.conf` | Q2.1 |
+| nginx reverse proxy with DNS-based upstream resolution | `frontend/nginx.conf` | Q2.1 |
 
 ## Pre-built Images
 
